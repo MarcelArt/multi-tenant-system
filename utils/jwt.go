@@ -69,3 +69,8 @@ func ClaimsNumberToString(i interface{}) string {
 
 	return strconv.Itoa(int(number))
 }
+
+func ClaimsNumberToUint(i any) uint {
+	number := i.(float64)
+	return uint(number)
+}

@@ -1,9 +1,10 @@
-
 package api_handlers
 
 import (
+	"github.com/MarcelArt/multi-tenant-system/database"
 	"github.com/MarcelArt/multi-tenant-system/models"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
+	"github.com/MarcelArt/multi-tenant-system/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 )
@@ -16,7 +17,7 @@ type OrganizationHandler struct {
 func NewOrganizationHandler(repo repositories.IOrganizationRepo) *OrganizationHandler {
 	return &OrganizationHandler{
 		BaseCrudHandler: BaseCrudHandler[models.Organization, models.OrganizationDTO, models.OrganizationPage]{
-			repo: repo,
+			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
 		repo: repo,
@@ -36,7 +37,51 @@ func NewOrganizationHandler(repo repositories.IOrganizationRepo) *OrganizationHa
 // @Failure 500 {object} string
 // @Router /organization [post]
 func (h *OrganizationHandler) Create(c *fiber.Ctx) error {
-	return h.BaseCrudHandler.Create(c)
+	var input models.OrganizationDTO
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	tx := database.GetDB().Begin()
+	defer tx.Rollback()
+	repo := repositories.NewOrganizationRepo(tx)
+	uoRepo := repositories.NewUserOrganizationRepo(tx)
+	rRepo := repositories.NewRoleRepo(tx)
+	urRepo := repositories.NewUserRoleRepo(tx)
+
+	id, err := repo.Create(input)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	userId := c.Locals("userId")
+	userOrg := models.UserOrganizationDTO{
+		OrganizationID: id,
+		UserID:         utils.ClaimsNumberToUint(userId),
+	}
+	if _, err := uoRepo.Create(userOrg); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	role := models.RoleDTO{
+		OrganizationID: id,
+		Value:          "Owner",
+	}
+	roleID, err := rRepo.Create(role)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	userRole := models.UserRoleDTO{
+		RoleID: roleID,
+		UserID: utils.ClaimsNumberToUint(userId),
+	}
+	if _, err := urRepo.Create(userRole); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	tx.Commit()
+	return c.Status(fiber.StatusCreated).JSON(models.NewJSONResponse(fiber.Map{"ID": id}, "Created successfully"))
 }
 
 // Read retrieves a list of organizations
