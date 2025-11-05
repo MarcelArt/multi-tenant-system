@@ -45,6 +45,7 @@ func MigrateDB() error {
 		models.UserOrganization{},
 		models.Role{},
 		models.UserRole{},
+		models.RolePermission{},
 	)
 	fmt.Println("Database Migrated")
 
@@ -58,6 +59,7 @@ func DropDB() error {
 		models.UserOrganization{},
 		models.Role{},
 		models.UserRole{},
+		models.RolePermission{},
 	)
 	fmt.Println("Database Droped")
 
