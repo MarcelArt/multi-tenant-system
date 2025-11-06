@@ -17,6 +17,7 @@ const userPageQuery = `
 type IUserRepo interface {
 	IBaseCrudRepo[models.User, models.UserDTO, models.UserPage]
 	GetByUsernameOrEmail(username string) (models.UserDTO, error)
+	GetPermissions(id any, orgID any) ([]string, error)
 }
 
 type UserRepo struct {
@@ -36,4 +37,22 @@ func (r *UserRepo) GetByUsernameOrEmail(username string) (models.UserDTO, error)
 	var user models.UserDTO
 	err := r.db.Where("(username = ? OR email = ?)", username, username).First(&user).Error
 	return user, err
+}
+
+func (r *UserRepo) GetPermissions(id any, orgID any) ([]string, error) {
+	var permissions []string
+	query := `
+		select
+			distinct rp."permission" as permissions
+		from roles r
+		left join role_permissions rp on r.id = rp.role_id 
+		left join user_roles ur on r.id = ur.role_id
+		where r.organization_id = ?
+		and ur.user_id = ?
+		and rp.deleted_at isnull
+		and ur.deleted_at isnull
+	`
+
+	err := r.db.Raw(query, orgID, id).Pluck("permissions", &permissions).Error
+	return permissions, err
 }

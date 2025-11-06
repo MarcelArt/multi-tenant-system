@@ -254,3 +254,26 @@ func (h *UserHandler) Refresh(c *fiber.Ctx) error {
 		Username:     user.Username,
 	}, "Tokens refreshed successfully"))
 }
+
+// GetPermissions retrieves a user permissions
+// @Summary Get a user permissions
+// @Description Get a user permissions
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param org_id path string true "Organization ID"
+// @Success 200 {array} string
+// @Failure 500 {object} string
+// @Router /user/permission/{org_id} [get]
+func (h *UserHandler) GetPermissions(c *fiber.Ctx) error {
+	id := c.Locals("userId")
+	orgID := c.Params("org_id")
+
+	permissions, err := h.repo.GetPermissions(id, orgID)
+	if err != nil {
+		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, "error retrieving permissions"))
+	}
+
+	return c.Status(fiber.StatusOK).JSON(models.NewJSONResponse(permissions, "Permissions retrieved successfully"))
+}
