@@ -2,9 +2,12 @@
 package middlewares
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/MarcelArt/multi-tenant-system/models"
+	"github.com/MarcelArt/multi-tenant-system/pkg/arrays"
+	"github.com/MarcelArt/multi-tenant-system/pkg/objects"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
 	"github.com/MarcelArt/multi-tenant-system/utils"
 	"github.com/gofiber/fiber/v2"
@@ -29,5 +32,36 @@ func (m *AuthMiddleware) ProtectedAPI(c *fiber.Ctx) error {
 	}
 
 	c.Locals("userId", claims["userId"])
+	c.Locals("orgPerms", claims["orgPerms"])
 	return c.Next()
+}
+
+func (m *AuthMiddleware) Authz(permissionKey string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		orgIDStr := c.Params("org_id")
+		orgID, err := strconv.Atoi(orgIDStr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, "invalid organization id"))
+		}
+
+		var orgPerms []models.OrganizationPermissionClaims
+		if err := objects.Cast(c.Locals("orgPerms"), &orgPerms); err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(models.NewJSONResponse(err, "invalid permissions"))
+		}
+
+		currentPerm := arrays.Find(orgPerms, func(orgPerm models.OrganizationPermissionClaims) bool {
+			return orgPerm.OrgID == uint(orgID)
+		})
+
+		permissions := strings.Split(currentPerm.Permissions, ";")
+		permission := arrays.Find(permissions, func(p string) bool {
+			return p == permissionKey
+		})
+
+		if permission == nil {
+			return c.Status(fiber.StatusForbidden).JSON(models.NewJSONResponse(nil, "access denied"))
+		}
+
+		return c.Next()
+	}
 }

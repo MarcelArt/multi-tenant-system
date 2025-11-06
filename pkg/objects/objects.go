@@ -1,6 +1,7 @@
 package objects
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 )
@@ -65,4 +66,26 @@ func Get(s any, field string) (any, error) {
 	value = f.Interface()
 
 	return value, nil
+}
+
+func ToMap(s any) (map[string]any, error) {
+	var sMap map[string]any
+	sJSON, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(sJSON, &sMap)
+
+	return sMap, err
+}
+
+// toPtr has to be a pointer
+func Cast(from any, toPtr any) error {
+	fromJSON, err := json.Marshal(from)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(fromJSON, toPtr)
 }

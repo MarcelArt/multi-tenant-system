@@ -15,14 +15,14 @@ func SetupRoleRoutes(api fiber.Router, auth *middlewares.AuthMiddleware) {
 	)
 
 	g := api.Group("/:org_id/role")
-	g.Get("/", auth.ProtectedAPI, h.Read)
-	g.Get("/:id", auth.ProtectedAPI, h.GetByID)
+	g.Get("/", auth.ProtectedAPI, auth.Authz("role#view"), h.Read)
+	g.Get("/:id", auth.ProtectedAPI, auth.Authz("role#view"), h.GetByID)
 
-	g.Post("/", auth.ProtectedAPI, h.Create)
+	g.Post("/", auth.ProtectedAPI, auth.Authz("role#manage"), h.Create)
 
-	g.Put("/:id", auth.ProtectedAPI, h.Update)
+	g.Put("/:id", auth.ProtectedAPI, auth.Authz("role#manage"), h.Update)
 
-	g.Patch("/permission", auth.ProtectedAPI, h.AssignPermissions)
+	g.Patch("/permission", auth.ProtectedAPI, auth.Authz("role#manage"), h.AssignPermissions)
 
-	g.Delete("/:id", auth.ProtectedAPI, h.Delete)
+	g.Delete("/:id", auth.ProtectedAPI, auth.Authz("role#manage"), h.Delete)
 }
