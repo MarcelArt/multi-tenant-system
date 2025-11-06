@@ -11,6 +11,9 @@ const rolePermissionPageQuery = `
 
 type IRolePermissionRepo interface {
 	IBaseCrudRepo[models.RolePermission, models.RolePermissionDTO, models.RolePermissionPage]
+	GetDistinctByRoleID(roleID any) ([]string, error)
+	DeleteByRoleIDAndPermissions(roleID any, permissions []string) error
+	BulkCreate(inputs []models.RolePermissionDTO) error
 }
 
 type RolePermissionRepo struct {
@@ -24,4 +27,18 @@ func NewRolePermissionRepo(db *gorm.DB) *RolePermissionRepo {
 			pageQuery: rolePermissionPageQuery,
 		},
 	}
+}
+
+func (r *RolePermissionRepo) GetDistinctByRoleID(roleID any) ([]string, error) {
+	var permissions []string
+	err := r.db.Model(models.RolePermission{}).Where("role_id = ?", roleID).Distinct("permission").Pluck("permission", &permissions).Error
+	return permissions, err
+}
+
+func (r *RolePermissionRepo) DeleteByRoleIDAndPermissions(roleID any, permissions []string) error {
+	return r.db.Where("role_id = ? AND permission IN ?", roleID, permissions).Delete(&models.RolePermission{}).Error
+}
+
+func (r *RolePermissionRepo) BulkCreate(inputs []models.RolePermissionDTO) error {
+	return r.db.Create(&inputs).Error
 }

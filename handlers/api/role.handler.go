@@ -1,24 +1,29 @@
 package api_handlers
 
 import (
+	"github.com/MarcelArt/multi-tenant-system/database"
 	"github.com/MarcelArt/multi-tenant-system/models"
+	"github.com/MarcelArt/multi-tenant-system/pkg/arrays"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
+	"github.com/MarcelArt/multi-tenant-system/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 )
 
 type RoleHandler struct {
 	OrgCrudHandler[models.Role, models.RoleDTO, models.RolePage]
-	repo repositories.IRoleRepo
+	repo   repositories.IRoleRepo
+	rpRepo repositories.IRolePermissionRepo
 }
 
-func NewRoleHandler(repo repositories.IRoleRepo) *RoleHandler {
+func NewRoleHandler(repo repositories.IRoleRepo, rpRepo repositories.IRolePermissionRepo) *RoleHandler {
 	return &RoleHandler{
 		OrgCrudHandler: OrgCrudHandler[models.Role, models.RoleDTO, models.RolePage]{
 			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
-		repo: repo,
+		repo:   repo,
+		rpRepo: rpRepo,
 	}
 }
 
@@ -105,4 +110,58 @@ func (h *RoleHandler) Delete(c *fiber.Ctx) error {
 // @Router /{org_id}/role/{id} [get]
 func (h *RoleHandler) GetByID(c *fiber.Ctx) error {
 	return h.OrgCrudHandler.GetByID(c)
+}
+
+// AssignPermissions Assign permission to an existing role
+// @Summary Assign permission to an existing role
+// @Description Assign permission to an existing role
+// @Tags Role
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param org_id path string true "Organization ID"
+// @Param Role body models.AssignPermissionsToRole true "Role data"
+// @Success 200 {object} models.JSONResponse
+// @Failure 400 {object} string
+// @Failure 500 {object} string
+// @Router /{org_id}/role/permission [patch]
+func (h *RoleHandler) AssignPermissions(c *fiber.Ctx) error {
+	var input models.AssignPermissionsToRole
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	oldPermissions, err := h.rpRepo.GetDistinctByRoleID(input.RoleID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error fetching existing permissions"))
+	}
+
+	removePerms, addPerms := utils.SliceDiffCheck(oldPermissions, input.Permissions)
+
+	tx := database.GetDB().Begin()
+	defer tx.Rollback()
+
+	rpRepo := repositories.NewRolePermissionRepo(tx)
+
+	if len(removePerms) > 0 {
+		if err := rpRepo.DeleteByRoleIDAndPermissions(input.RoleID, removePerms); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error removing old permissions"))
+		}
+	}
+
+	if len(addPerms) > 0 {
+		rolePermissions := arrays.Map(addPerms, func(perm string) models.RolePermissionDTO {
+			return models.RolePermissionDTO{
+				RoleID:     input.RoleID,
+				Permission: perm,
+			}
+		})
+
+		if err := rpRepo.BulkCreate(rolePermissions); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error adding new permissions"))
+		}
+	}
+
+	tx.Commit()
+	return c.Status(fiber.StatusOK).JSON(models.NewJSONResponse(nil, "Permissions assigned successfully"))
 }

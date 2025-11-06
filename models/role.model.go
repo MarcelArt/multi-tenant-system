@@ -23,6 +23,11 @@ type RolePage struct {
 	Value string `gorm:"not null" json:"value"`
 }
 
+type AssignPermissionsToRole struct {
+	RoleID      uint     `json:"roleId"`
+	Permissions []string `json:"permissions"`
+}
+
 func (RoleDTO) TableName() string {
 	return roleTableName
 }
