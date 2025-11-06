@@ -48,6 +48,7 @@ func (h *OrganizationHandler) Create(c *fiber.Ctx) error {
 	uoRepo := repositories.NewUserOrganizationRepo(tx)
 	rRepo := repositories.NewRoleRepo(tx)
 	urRepo := repositories.NewUserRoleRepo(tx)
+	rpRepo := repositories.NewRolePermissionRepo(tx)
 
 	id, err := repo.Create(input)
 	if err != nil {
@@ -70,6 +71,14 @@ func (h *OrganizationHandler) Create(c *fiber.Ctx) error {
 	roleID, err := rRepo.Create(role)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	permissions := []models.RolePermissionDTO{
+		{RoleID: roleID, Permission: "role#view"},
+		{RoleID: roleID, Permission: "role#manage"},
+	}
+	if err := rpRepo.BulkCreate(permissions); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "failed creating default permissions"))
 	}
 
 	userRole := models.UserRoleDTO{
