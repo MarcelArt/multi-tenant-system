@@ -48,6 +48,17 @@ type RefreshInput struct {
 	RefreshToken string `json:"refreshToken" validate:"jwt"`
 }
 
+type OrganizationPermissionClaims struct {
+	OrgID       uint   `json:"orgId"`
+	Permissions string `json:"permissions"`
+}
+
+type UserClaims struct {
+	ID       uint                           `json:"id"`
+	Username string                         `json:"username"`
+	OrgPerms []OrganizationPermissionClaims `json:"orgPerms"`
+}
+
 func (UserDTO) TableName() string {
 	return userTableName
 }
@@ -67,6 +78,29 @@ func (m UserDTO) RefreshClaims(isRemember bool) jwt.MapClaims {
 	}
 	return jwt.MapClaims{
 		"userId":     m.ID,
+		"isRemember": isRemember,
+		"exp":        expireAt.Unix(),
+	}
+}
+
+func (m UserClaims) AccessClaims(exp int64) jwt.MapClaims {
+	return jwt.MapClaims{
+		"username": m.Username,
+		"userId":   m.ID,
+		"sub":      m.ID,
+		"exp":      exp,
+		"orgPerms": m.OrgPerms,
+	}
+}
+
+func (m UserClaims) RefreshClaims(isRemember bool) jwt.MapClaims {
+	expireAt := time.Now().Add(enums.Day)
+	if isRemember {
+		expireAt = time.Now().Add(enums.Month)
+	}
+	return jwt.MapClaims{
+		"userId":     m.ID,
+		"sub":        m.ID,
 		"isRemember": isRemember,
 		"exp":        expireAt.Unix(),
 	}

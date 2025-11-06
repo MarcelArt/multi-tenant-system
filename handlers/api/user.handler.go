@@ -179,7 +179,17 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, "Username or password is incorrect"))
 	}
 
-	accessToken, refreshToken, err := utils.GenerateTokenPair(userDB, user.IsRemember)
+	orgPermissions, err := h.repo.GetPermissions(userDB.ID)
+	if err != nil {
+		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, "error retrieving permissions"))
+	}
+	userClaims := models.UserClaims{
+		ID:       userDB.ID,
+		Username: userDB.Username,
+		OrgPerms: orgPermissions,
+	}
+
+	accessToken, refreshToken, err := utils.GenerateTokenPair(userClaims, user.IsRemember)
 	if err != nil {
 		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, ""))
 	}
@@ -232,14 +242,18 @@ func (h *UserHandler) Refresh(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(models.NewJSONResponse(err, ""))
 	}
 
+	orgPermissions, err := h.repo.GetPermissions(userID)
+	if err != nil {
+		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, "error retrieving permissions"))
+	}
+	userClaims := models.UserClaims{
+		ID:       user.ID,
+		Username: user.Username,
+		OrgPerms: orgPermissions,
+	}
+
 	accessToken, refreshToken, err := utils.GenerateTokenPair(
-		models.UserDTO{
-			Username: user.Username,
-			Email:    user.Email,
-			DTO: models.DTO{
-				ID: user.ID,
-			},
-		},
+		userClaims,
 		isRemember,
 	)
 	if err != nil {
@@ -255,7 +269,7 @@ func (h *UserHandler) Refresh(c *fiber.Ctx) error {
 	}, "Tokens refreshed successfully"))
 }
 
-// GetPermissions retrieves a user permissions
+// GetOrgPermissions retrieves a user permissions
 // @Summary Get a user permissions
 // @Description Get a user permissions
 // @Tags User
@@ -266,11 +280,11 @@ func (h *UserHandler) Refresh(c *fiber.Ctx) error {
 // @Success 200 {array} string
 // @Failure 500 {object} string
 // @Router /user/permission/{org_id} [get]
-func (h *UserHandler) GetPermissions(c *fiber.Ctx) error {
+func (h *UserHandler) GetOrgPermissions(c *fiber.Ctx) error {
 	id := c.Locals("userId")
 	orgID := c.Params("org_id")
 
-	permissions, err := h.repo.GetPermissions(id, orgID)
+	permissions, err := h.repo.GetOrgPermissions(id, orgID)
 	if err != nil {
 		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, "error retrieving permissions"))
 	}

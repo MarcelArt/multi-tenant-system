@@ -17,7 +17,8 @@ const userPageQuery = `
 type IUserRepo interface {
 	IBaseCrudRepo[models.User, models.UserDTO, models.UserPage]
 	GetByUsernameOrEmail(username string) (models.UserDTO, error)
-	GetPermissions(id any, orgID any) ([]string, error)
+	GetOrgPermissions(id any, orgID any) ([]string, error)
+	GetPermissions(id any) ([]models.OrganizationPermissionClaims, error)
 }
 
 type UserRepo struct {
@@ -39,7 +40,7 @@ func (r *UserRepo) GetByUsernameOrEmail(username string) (models.UserDTO, error)
 	return user, err
 }
 
-func (r *UserRepo) GetPermissions(id any, orgID any) ([]string, error) {
+func (r *UserRepo) GetOrgPermissions(id any, orgID any) ([]string, error) {
 	var permissions []string
 	query := `
 		select
@@ -55,4 +56,23 @@ func (r *UserRepo) GetPermissions(id any, orgID any) ([]string, error) {
 
 	err := r.db.Raw(query, orgID, id).Pluck("permissions", &permissions).Error
 	return permissions, err
+}
+
+func (r *UserRepo) GetPermissions(id any) ([]models.OrganizationPermissionClaims, error) {
+	var orgPermissions []models.OrganizationPermissionClaims
+	query := `
+		select
+			r.organization_id as org_id,
+			string_agg(rp."permission", ';') as permissions
+		from roles r
+		left join role_permissions rp on r.id = rp.role_id 
+		left join user_roles ur on r.id = ur.role_id
+		where ur.user_id = ?
+		and rp.deleted_at isnull
+		and ur.deleted_at isnull
+		group by r.organization_id 
+	`
+
+	err := r.db.Raw(query, id).Scan(&orgPermissions).Error
+	return orgPermissions, err
 }
