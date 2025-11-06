@@ -7,6 +7,7 @@ import (
 
 const rolePermissionPageQuery = `
 	select * from role_permissions rp 
+	where rp.deleted_at is null
 `
 
 type IRolePermissionRepo interface {

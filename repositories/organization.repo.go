@@ -7,6 +7,7 @@ import (
 
 const organizationPageQuery = `
 	select * from organizations o
+	where o.deleted_at is null
 `
 
 type IOrganizationRepo interface {

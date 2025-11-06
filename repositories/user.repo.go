@@ -11,6 +11,7 @@ const userPageQuery = `
 		username, 
 		email
 	from users
+	where deleted_at is null
 `
 
 type IUserRepo interface {

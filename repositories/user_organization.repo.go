@@ -7,6 +7,7 @@ import (
 
 const userOrganizationPageQuery = `
 	select * from user_organizations uo
+	where uo.deleted_at is null
 `
 
 type IUserOrganizationRepo interface {

@@ -7,6 +7,7 @@ import (
 
 const userRolePageQuery = `
 	select * from user_roles ur
+	where ur.deleted_at is null
 `
 
 type IUserRoleRepo interface {

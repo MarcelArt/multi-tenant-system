@@ -8,6 +8,7 @@ import (
 const rolePageQuery = `
 	select * from roles r 
 	where r.organization_id = ?
+	and r.deleted_at is null
 `
 
 type IRoleRepo interface {
