@@ -1,0 +1,26 @@
+services:
+  mts-postgres:
+    image: postgres:17
+    container_name: mts-postgres
+    restart: no
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - 5434:5432
+    volumes:
+      - mts-db:/var/lib/postgresql/data
+  mts:
+    image: marcelaritonang/multi-tenant-system:latest
+    container_name: mts
+    ports:
+      - 8080:8080
+    env_file:
+      - .env
+    restart: no
+    depends_on:
+      - mts-postgres
+
+volumes:
+  mts-db:
