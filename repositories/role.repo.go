@@ -6,9 +6,17 @@ import (
 )
 
 const rolePageQuery = `
-	select * from roles r 
-	where r.organization_id = ?
-	and r.deleted_at is null
+	select
+		r.id id,
+		r.value value,
+		string_agg(rp.permission, ';') permissions
+	from
+		roles r
+	left join role_permissions rp on r.id = rp.role_id and rp.deleted_at isnull
+	where
+		r.organization_id = ?
+		and r.deleted_at is null
+	group by r.id, r.value
 `
 
 type IRoleRepo interface {

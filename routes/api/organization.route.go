@@ -1,4 +1,3 @@
-
 package api_routes
 
 import (
@@ -14,8 +13,8 @@ func SetupOrganizationRoutes(api fiber.Router, auth *middlewares.AuthMiddleware)
 
 	g := api.Group("/organization")
 	g.Get("/", auth.ProtectedAPI, h.Read)
-	g.Get("/:id", auth.ProtectedAPI, h.GetByID)
+	g.Get("/:id", auth.ProtectedAPI, auth.Authz("organization#view"), h.GetByID)
 	g.Post("/", auth.ProtectedAPI, h.Create)
-	g.Put("/:id", auth.ProtectedAPI, h.Update)
-	g.Delete("/:id", auth.ProtectedAPI, h.Delete)
+	g.Put("/:id", auth.ProtectedAPI, auth.Authz("organization#manage"), h.Update)
+	g.Delete("/:id", auth.ProtectedAPI, auth.Authz("organization#manage"), h.Delete)
 }

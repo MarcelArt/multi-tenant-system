@@ -1,8 +1,8 @@
-
 package api_handlers
 
 import (
 	"github.com/MarcelArt/multi-tenant-system/models"
+	"github.com/MarcelArt/multi-tenant-system/pkg/arrays"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -16,7 +16,7 @@ type UserOrganizationHandler struct {
 func NewUserOrganizationHandler(repo repositories.IUserOrganizationRepo) *UserOrganizationHandler {
 	return &UserOrganizationHandler{
 		BaseCrudHandler: BaseCrudHandler[models.UserOrganization, models.UserOrganizationDTO, models.UserOrganizationPage]{
-			repo: repo,
+			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
 		repo: repo,
@@ -101,4 +101,38 @@ func (h *UserOrganizationHandler) Delete(c *fiber.Ctx) error {
 // @Router /user-organization/{id} [get]
 func (h *UserOrganizationHandler) GetByID(c *fiber.Ctx) error {
 	return h.BaseCrudHandler.GetByID(c)
+}
+
+// Invites user to organization
+// @Summary Invites user to organization
+// @Description Invites user to organization
+// @Tags UserOrganization
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param UserOrganization body models.InviteUser true "UserOrganization data"
+// @Success 201 {array} models.UserOrganizationDTO
+// @Failure 400 {object} string
+// @Failure 500 {object} string
+// @Router /user-organization/invite [post]
+func (h *UserOrganizationHandler) InviteUsers(c *fiber.Ctx) error {
+	var invitations models.InviteUser
+	if err := c.BodyParser(&invitations); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, "error parsing json body"))
+	}
+
+	userOrganizations := arrays.Map(invitations.UserIDs, func(userID uint) models.UserOrganizationDTO {
+		return models.UserOrganizationDTO{
+			UserID:         userID,
+			OrganizationID: invitations.OrganizationID,
+			Status:         "pending",
+		}
+	})
+
+	userOrganizations, err := h.repo.BulkCreate(userOrganizations)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "failed saving user organization"))
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(models.NewJSONResponse(userOrganizations, "users successfully invited to organization"))
 }

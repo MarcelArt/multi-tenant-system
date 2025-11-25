@@ -2,6 +2,7 @@ package api_handlers
 
 import (
 	"github.com/MarcelArt/multi-tenant-system/database"
+	"github.com/MarcelArt/multi-tenant-system/enums"
 	"github.com/MarcelArt/multi-tenant-system/models"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
 	"github.com/MarcelArt/multi-tenant-system/utils"
@@ -59,6 +60,7 @@ func (h *OrganizationHandler) Create(c *fiber.Ctx) error {
 	userOrg := models.UserOrganizationDTO{
 		OrganizationID: id,
 		UserID:         utils.ClaimsNumberToUint(userId),
+		Status:         "active",
 	}
 	if _, err := uoRepo.Create(userOrg); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
@@ -73,11 +75,10 @@ func (h *OrganizationHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, ""))
 	}
 
-	permissions := []models.RolePermissionDTO{
-		{RoleID: roleID, Permission: "role#view"},
-		{RoleID: roleID, Permission: "role#manage"},
+	permission := models.RolePermissionDTO{
+		RoleID: roleID, Permission: enums.FullAccess,
 	}
-	if err := rpRepo.BulkCreate(permissions); err != nil {
+	if _, err := rpRepo.Create(permission); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "failed creating default permissions"))
 	}
 

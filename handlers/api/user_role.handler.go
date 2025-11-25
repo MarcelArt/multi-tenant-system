@@ -1,4 +1,3 @@
-
 package api_handlers
 
 import (
@@ -16,7 +15,7 @@ type UserRoleHandler struct {
 func NewUserRoleHandler(repo repositories.IUserRoleRepo) *UserRoleHandler {
 	return &UserRoleHandler{
 		BaseCrudHandler: BaseCrudHandler[models.UserRole, models.UserRoleDTO, models.UserRolePage]{
-			repo: repo,
+			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
 		repo: repo,

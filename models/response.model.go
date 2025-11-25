@@ -14,11 +14,13 @@ func NewJSONResponse(items interface{}, message string) *JSONResponse {
 	if ok {
 		if message == "" {
 			message = err.Error()
+		} else {
+			message = fmt.Sprintf("%s: %s", message, err.Error())
 		}
 		return &JSONResponse{
 			Items:     nil,
 			IsSuccess: false,
-			Message:   fmt.Sprintf("%s: %s", message, err.Error()),
+			Message:   message,
 		}
 	}
 

@@ -4,7 +4,6 @@ package routes
 import (
 	"log"
 	"os"
-	"time"
 
 	"github.com/MarcelArt/multi-tenant-system/config"
 	"github.com/MarcelArt/multi-tenant-system/database"
@@ -13,7 +12,6 @@ import (
 	api_routes "github.com/MarcelArt/multi-tenant-system/routes/api"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/swagger"
@@ -27,10 +25,10 @@ func SetupRoutes(app *fiber.App) {
 		log.Fatalf("error opening file: %v", err)
 	}
 
-	app.Use(limiter.New(limiter.Config{
-		Max:        20,
-		Expiration: 30 * time.Second,
-	}))
+	// app.Use(limiter.New(limiter.Config{
+	// 	Max:        20,
+	// 	Expiration: 30 * time.Second,
+	// }))
 
 	if config.Env.ServerENV != "prod" {
 		app.Get("/swagger/*", swagger.HandlerDefault)     // default
@@ -38,11 +36,15 @@ func SetupRoutes(app *fiber.App) {
 			URL:         "http://example.com/doc.json",
 			DeepLinking: false,
 		}))
+		// log.Println("Proxy react dev server")
+		// app.Get("/", proxy.Forward("http://localhost:3000"))
+	} else {
+		log.Println("Prod specific routing")
 	}
 
 	app.Get("/metrics", monitor.New())
 
-	authMiddleware := middlewares.NewAuthMiddleware(repositories.NewUserRepo(database.GetDB()))
+	authMiddleware := middlewares.NewAuthMiddleware(repositories.NewUserRepo(database.GetDB()), repositories.NewAccessLogRepo(database.GetDB()))
 
 	api := app.Group("/api")
 	api.Use(logger.New(logger.Config{
@@ -63,4 +65,9 @@ func SetupRoutes(app *fiber.App) {
 	api_routes.SetupRoleRoutes(api, authMiddleware)
 	api_routes.SetupUserRoleRoutes(api, authMiddleware)
 	api_routes.SetupRolePermissionRoutes(api, authMiddleware)
+	api_routes.SetupAccessLogRoutes(api, authMiddleware)
+	api_routes.SetupFormTemplateRoutes(api, authMiddleware)
+
+	app.Static("/assets", "./web/dist/assets")
+	app.Static("/*", "./web/dist")
 }

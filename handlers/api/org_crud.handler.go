@@ -60,7 +60,7 @@ func (h *OrgCrudHandler[TModel, TDto, TPage]) Update(c *fiber.Ctx) error {
 		return c.Status(utils.StatusCodeByError(err)).JSON(models.NewJSONResponse(err, ""))
 	}
 
-	return c.Status(fiber.StatusOK).JSON(dto)
+	return c.Status(fiber.StatusOK).JSON(models.NewJSONResponse(dto, "Updated successfully"))
 }
 
 func (h *OrgCrudHandler[TModel, TDto, TPage]) Delete(c *fiber.Ctx) error {

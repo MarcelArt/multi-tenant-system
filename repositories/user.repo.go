@@ -3,11 +3,14 @@ package repositories
 
 import (
 	"github.com/MarcelArt/multi-tenant-system/models"
+	"github.com/gofiber/fiber/v2"
+	"github.com/morkid/paginate"
 	"gorm.io/gorm"
 )
 
 const userPageQuery = `
 	select 
+		id,
 		username, 
 		email
 	from users
@@ -19,6 +22,7 @@ type IUserRepo interface {
 	GetByUsernameOrEmail(username string) (models.UserDTO, error)
 	GetOrgPermissions(id any, orgID any) ([]string, error)
 	GetPermissions(id any) ([]models.OrganizationPermissionClaims, error)
+	GetByOrgIDWithRoles(orgID any, c *fiber.Ctx) paginate.Page
 }
 
 type UserRepo struct {
@@ -75,4 +79,35 @@ func (r *UserRepo) GetPermissions(id any) ([]models.OrganizationPermissionClaims
 
 	err := r.db.Raw(query, id).Scan(&orgPermissions).Error
 	return orgPermissions, err
+}
+
+func (r *UserRepo) GetByOrgIDWithRoles(orgID any, c *fiber.Ctx) paginate.Page {
+	pg := paginate.New()
+
+	query := `
+		select 
+				u.id id,
+				u.username username, 
+				u.email email,
+				uo.organization_id organization_id,
+				string_agg(r.value, ';') roles,
+				string_agg(r.id::text, ';') role_ids
+		from users u
+		left join user_roles ur on u.id = ur.user_id and ur.deleted_at isnull
+		left join roles r on ur.role_id = r.id and r.deleted_at isnull
+		left join user_organizations uo on u.id = uo.user_id and uo.deleted_at isnull
+		where u.deleted_at is null
+		and uo.organization_id = ?
+		group by
+				u.id,
+				u.username,
+				u.email,
+				uo.organization_id
+	`
+	stmt := r.db.Raw(query, orgID)
+
+	var dest []models.UserWithRoles
+	page := pg.With(stmt).Request(c.Request()).Response(&dest)
+
+	return page
 }

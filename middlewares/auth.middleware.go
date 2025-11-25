@@ -2,9 +2,11 @@
 package middlewares
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/MarcelArt/multi-tenant-system/enums"
 	"github.com/MarcelArt/multi-tenant-system/models"
 	"github.com/MarcelArt/multi-tenant-system/pkg/arrays"
 	"github.com/MarcelArt/multi-tenant-system/pkg/objects"
@@ -14,12 +16,14 @@ import (
 )
 
 type AuthMiddleware struct {
-	uRepo repositories.IUserRepo
+	uRepo  repositories.IUserRepo
+	alRepo repositories.IAccessLogRepo
 }
 
-func NewAuthMiddleware(uRepo repositories.IUserRepo) *AuthMiddleware {
+func NewAuthMiddleware(uRepo repositories.IUserRepo, alRepo repositories.IAccessLogRepo) *AuthMiddleware {
 	return &AuthMiddleware{
-		uRepo: uRepo,
+		uRepo:  uRepo,
+		alRepo: alRepo,
 	}
 }
 
@@ -38,14 +42,40 @@ func (m *AuthMiddleware) ProtectedAPI(c *fiber.Ctx) error {
 
 func (m *AuthMiddleware) Authz(permissionKey string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		userID := utils.ClaimsNumberToUint(c.Locals("userId"))
+
+		// check from param org_id first
 		orgIDStr := c.Params("org_id")
+
+		// check from request body either have field organizationId or orgId
+		if orgIDStr == "" {
+			var orgIdBody models.OrganizationID
+			orgIdBody.FromBody(c)
+			orgIDStr = orgIdBody.ToString()
+		}
+
+		// check from param id if all failed
+		if orgIDStr == "" {
+			orgIDStr = c.Params("id")
+		}
+
 		orgID, err := strconv.Atoi(orgIDStr)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, "invalid organization id"))
 		}
 
+		accessLog := models.AccessLogDTO{
+			Permission:     permissionKey,
+			IsAuthorized:   false,
+			Message:        "Unknown failure",
+			UserID:         userID,
+			OrganizationID: uint(orgID),
+		}
+
 		var orgPerms []models.OrganizationPermissionClaims
 		if err := objects.Cast(c.Locals("orgPerms"), &orgPerms); err != nil {
+			accessLog.IsAuthorized = false
+			accessLog.Message = "Invalid permissions, token has broken orgPerms claims"
 			return c.Status(fiber.StatusForbidden).JSON(models.NewJSONResponse(err, "invalid permissions"))
 		}
 
@@ -53,15 +83,28 @@ func (m *AuthMiddleware) Authz(permissionKey string) fiber.Handler {
 			return orgPerm.OrgID == uint(orgID)
 		})
 
+		if currentPerm == nil {
+			accessLog.IsAuthorized = false
+			accessLog.Message = "No permissions found for this organization in current user's token"
+			m.alRepo.Create(accessLog)
+			return c.Status(fiber.StatusForbidden).JSON(models.NewJSONResponse(nil, "token invalid please relogin"))
+		}
+
 		permissions := strings.Split(currentPerm.Permissions, ";")
 		permission := arrays.Find(permissions, func(p string) bool {
-			return p == permissionKey
+			return p == permissionKey || p == enums.FullAccess
 		})
 
 		if permission == nil {
+			accessLog.IsAuthorized = false
+			accessLog.Message = fmt.Sprintf("User's role does not contain `%s` permission", permissionKey)
+			m.alRepo.Create(accessLog)
 			return c.Status(fiber.StatusForbidden).JSON(models.NewJSONResponse(nil, "access denied"))
 		}
 
+		accessLog.IsAuthorized = true
+		accessLog.Message = "Authorized"
+		m.alRepo.Create(accessLog)
 		return c.Next()
 	}
 }

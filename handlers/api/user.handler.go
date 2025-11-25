@@ -2,7 +2,9 @@
 package api_handlers
 
 import (
+	"github.com/MarcelArt/multi-tenant-system/database"
 	"github.com/MarcelArt/multi-tenant-system/models"
+	"github.com/MarcelArt/multi-tenant-system/pkg/arrays"
 	"github.com/MarcelArt/multi-tenant-system/repositories"
 	"github.com/MarcelArt/multi-tenant-system/utils"
 	"github.com/go-playground/validator/v10"
@@ -12,16 +14,18 @@ import (
 
 type UserHandler struct {
 	BaseCrudHandler[models.User, models.UserDTO, models.UserPage]
-	repo repositories.IUserRepo
+	repo   repositories.IUserRepo
+	urRepo repositories.IUserRoleRepo
 }
 
-func NewUserHandler(repo repositories.IUserRepo) *UserHandler {
+func NewUserHandler(repo repositories.IUserRepo, urRepo repositories.IUserRoleRepo) *UserHandler {
 	return &UserHandler{
 		BaseCrudHandler: BaseCrudHandler[models.User, models.UserDTO, models.UserPage]{
 			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
-		repo: repo,
+		repo:   repo,
+		urRepo: urRepo,
 	}
 }
 
@@ -290,4 +294,81 @@ func (h *UserHandler) GetOrgPermissions(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(models.NewJSONResponse(permissions, "Permissions retrieved successfully"))
+}
+
+// GetByOrgIDWithRoles retrieves all users in organization roles
+// @Summary Get all users in organization roles
+// @Description Get all users in organization roles
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param org_id path string true "Organization ID"
+// @Param page query int false "Page"
+// @Param size query int false "Size"
+// @Param sort query string false "Sort"
+// @Param filters query string false "Filter"
+// @Success 200 {array} string
+// @Failure 500 {object} string
+// @Router /user/role/{org_id} [get]
+func (h *UserHandler) GetByOrgIDWithRoles(c *fiber.Ctx) error {
+	orgID := c.Params("org_id")
+
+	page := h.repo.GetByOrgIDWithRoles(orgID, c)
+	return c.Status(fiber.StatusOK).JSON(page)
+}
+
+// AssignRoles Assign roles to a user
+// @Summary Assign roles to a user
+// @Description Assign roles to a user
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param org_id path string true "Organization ID"
+// @Param Role body models.AssignRolesToUser true "Role data"
+// @Success 200 {object} models.JSONResponse
+// @Failure 400 {object} string
+// @Failure 500 {object} string
+// @Router /user/role/{org_id} [patch]
+func (h *UserHandler) AssignRoles(c *fiber.Ctx) error {
+	var input models.AssignRolesToUser
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.NewJSONResponse(err, ""))
+	}
+
+	oldPermissions, err := h.urRepo.GetDistinctByUserID(input.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error fetching existing roles"))
+	}
+
+	removeRoles, addPerms := utils.SliceDiffCheck(oldPermissions, input.RoleIDs)
+
+	tx := database.GetDB().Begin()
+	defer tx.Rollback()
+
+	urRepo := repositories.NewUserRoleRepo(tx)
+
+	if len(removeRoles) > 0 {
+		if err := urRepo.DeleteByUserIDAndRoleIDs(input.UserID, removeRoles); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error removing old roles"))
+		}
+	}
+
+	if len(addPerms) > 0 {
+		userRoles := arrays.Map(addPerms, func(roleID uint) models.UserRoleDTO {
+			return models.UserRoleDTO{
+				RoleID: roleID,
+				UserID: input.UserID,
+			}
+		})
+
+		if err := urRepo.BulkCreate(userRoles); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.NewJSONResponse(err, "error adding new roles"))
+		}
+	}
+
+	tx.Commit()
+	return c.Status(fiber.StatusOK).JSON(models.NewJSONResponse(nil, "Roles assigned successfully"))
 }
