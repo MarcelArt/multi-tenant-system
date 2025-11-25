@@ -8,7 +8,7 @@ export function BreadcrumbComponent() {
 	if (matches.some((match) => match.status === 'pending')) return null;
 
 	const matchesWithCrumbs = matches.filter((match) => isMatch(match, 'loaderData.crumbs'));
-	const breadcrumbs = matchesWithCrumbs[matchesWithCrumbs.length - 1]?.loaderData?.crumbs ?? [{ title: 'Formigo', link: '#' }];
+	const breadcrumbs = matchesWithCrumbs[matchesWithCrumbs.length - 1]?.loaderData?.crumbs ?? [{ title: 'Multi Tenant System', link: '#' }];
 
 	return (
 		<Breadcrumb>

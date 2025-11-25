@@ -57,9 +57,9 @@ export function SignupForm({ className, ...props }: React.ComponentProps<'div'>)
 							<div className="flex size-8 items-center justify-center rounded-md">
 								<GalleryVerticalEnd className="size-6" />
 							</div>
-							<span className="sr-only">Formigo.</span>
+							<span className="sr-only">Multi Tenant System.</span>
 						</a>
-						<h1 className="text-xl font-bold">Welcome to Formigo.</h1>
+						<h1 className="text-xl font-bold">Welcome to Multi Tenant System.</h1>
 						<FieldDescription>
 							Already have an account? <Link to="/login">Sign in</Link>
 						</FieldDescription>

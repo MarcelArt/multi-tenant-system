@@ -1,4 +1,3 @@
-
 package api_handlers
 
 import (
@@ -16,7 +15,7 @@ type RolePermissionHandler struct {
 func NewRolePermissionHandler(repo repositories.IRolePermissionRepo) *RolePermissionHandler {
 	return &RolePermissionHandler{
 		BaseCrudHandler: BaseCrudHandler[models.RolePermission, models.RolePermissionDTO, models.RolePermissionPage]{
-			repo: repo,
+			repo:      repo,
 			validator: validator.New(validator.WithRequiredStructEnabled()),
 		},
 		repo: repo,

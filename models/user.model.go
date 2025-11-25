@@ -26,8 +26,18 @@ type UserDTO struct {
 }
 
 type UserPage struct {
+	ID       uint   `gorm:"primarykey" json:"ID"`
 	Username string `json:"username" gorm:"unique;not null"`
 	Email    string `json:"email" gorm:"unique;not null" validate:"email"`
+}
+
+type UserWithRoles struct {
+	ID             uint   `gorm:"primarykey" json:"ID"`
+	Username       string `json:"username" gorm:"unique;not null"`
+	Email          string `json:"email" gorm:"unique;not null" validate:"email"`
+	OrganizationID uint   `json:"organizationId"`
+	Roles          string `json:"roles"`
+	RoleIDs        string `json:"roleIds"`
 }
 
 type LoginInput struct {
@@ -57,6 +67,11 @@ type UserClaims struct {
 	ID       uint                           `json:"id"`
 	Username string                         `json:"username"`
 	OrgPerms []OrganizationPermissionClaims `json:"orgPerms"`
+}
+
+type AssignRolesToUser struct {
+	UserID  uint   `json:"userId"`
+	RoleIDs []uint `json:"roleIds"`
 }
 
 func (UserDTO) TableName() string {

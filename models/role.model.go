@@ -19,8 +19,9 @@ type RoleDTO struct {
 }
 
 type RolePage struct {
-	ID    uint   `gorm:"primarykey" json:"ID"`
-	Value string `gorm:"not null" json:"value"`
+	ID          uint   `gorm:"primarykey" json:"ID"`
+	Value       string `gorm:"not null" json:"value"`
+	Permissions string `json:"permissions"`
 }
 
 type AssignPermissionsToRole struct {
